@@ -1,24 +1,19 @@
-# face-recognition
+# Implementation of face-api.js with Vue
 
 ## Project setup
+
 ```
-pnpm install
+pnpm/npm install
 ```
 
 ### Compiles and hot-reloads for development
+
 ```
-pnpm run serve
+pnpm/npm run serve
 ```
 
 ### Compiles and minifies for production
-```
-pnpm run build
-```
 
-### Lints and fixes files
 ```
-pnpm run lint
+pnpm/npm run build
 ```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
