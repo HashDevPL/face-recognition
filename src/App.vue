@@ -1,6 +1,5 @@
 <template>
   <div id="app">
-    <div class="faceExpression">{{ faceExpression }}</div>
     <div ref="wrapper" class="wrapper">
       <video ref="video" width="1280" height="720" muted autoplay @play="startDetections"></video>
       <canvas ref="canvas" width="1280" height="720"></canvas>
@@ -15,9 +14,9 @@ export default {
   name: 'App',
   data() {
     return {
+      videoSize: { width: 1280, height: 720 },
       ctx: null,
       pointSize: 3,
-      faceExpression: '',
     }
   },
   mounted() {
@@ -39,8 +38,7 @@ export default {
     startDetections() {
       // const canvas = faceapi.createCanvasFromMedia(this.$refs.video)
       // this.$refs.wrapper.appendChild(canvas)
-      const videoSize = { width: 1280, height: 720 }
-      faceapi.matchDimensions(this.$refs.canvas, videoSize)
+      faceapi.matchDimensions(this.$refs.canvas, this.videoSize)
       setInterval(async () => {
         const detections = await faceapi
           .detectAllFaces(this.$refs.video, new faceapi.TinyFaceDetectorOptions())
@@ -53,33 +51,34 @@ export default {
         // detections[0].expressions[v] < detections[0].expressions[key] ? v : key
         // )
         // console.log(key)
-        const resizedDetections = faceapi.resizeResults(detections, videoSize)
+        const resizedDetections = faceapi.resizeResults(detections, this.videoSize)
         // let key = Object.keys(resizedDetections[0].expressions).reduce((key, v) =>
         //   resizedDetections[0].expressions[v] < resizedDetections[0].expressions[key] ? v : key
         // )
-        if (resizedDetections[0]) {
-          // console.log(resizedDetections[0].expressions)
-          const faceExpressionsProbability = Object.values(
-            resizedDetections[0].expressions
-          ).map(item => Number(item).toFixed(5))
-          const maxFaceExpressionsProbability = Math.max.apply(Math, faceExpressionsProbability)
+        // if (resizedDetections[0]) {
+        //   // console.log(resizedDetections[0].expressions)
+        //   const faceExpressionsProbability = Object.values(
+        //     resizedDetections[0].expressions
+        //   ).map(item => Number(item).toFixed(5))
+        //   const maxFaceExpressionsProbability = Math.max.apply(Math, faceExpressionsProbability)
 
-          const faceExpression = Object.keys(resizedDetections[0].expressions).filter(function(
-            key
-          ) {
-            return (
-              Number(resizedDetections[0].expressions[key]).toFixed(5) ==
-              maxFaceExpressionsProbability
-            )
-          })[0]
-          if (this.faceExpression != faceExpression) this.faceExpression = faceExpression
-          // console.log(faceExpression)
-        }
+        //   const faceExpression = Object.keys(resizedDetections[0].expressions).filter(function(
+        //     key
+        //   ) {
+        //     return (
+        //       Number(resizedDetections[0].expressions[key]).toFixed(5) ==
+        //       maxFaceExpressionsProbability
+        //     )
+        //   })[0]
+        //   if (this.faceExpression != faceExpression) this.faceExpression = faceExpression
+        //   // console.log(faceExpression)
+        // }
         // faceapi.matchDimensions(canvas, videoSize)
-        const detection = await faceapi
-          .detectSingleFace(this.$refs.video, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-        const landmarks = detection.landmarks
+        // const detection = await faceapi
+        //   .detectSingleFace(this.$refs.video, new faceapi.TinyFaceDetectorOptions())
+        //   .withFaceLandmarks()
+        const landmarks = []
+        detections.map(item => landmarks.push(item.landmarks))
         // const landmarksResized = faceapi.resizeResults(landmarks, videoSize)
 
         // const jawOutline = landmarksResized.getJawOutline()
@@ -93,14 +92,17 @@ export default {
           .getContext('2d')
           .clearRect(0, 0, this.$refs.canvas.width, this.$refs.canvas.height)
         // faceapi.draw.drawDetections(this.$refs.canvas, resizedDetections)
-        console.log(
-          resizedDetections[0].detection.box.x,
-          resizedDetections[0].detection.box.y,
-          resizedDetections[0].detection.box.width,
-          resizedDetections[0].detection.box.height
+        // console.log(
+        //   resizedDetections[0].detection.box.x,
+        //   resizedDetections[0].detection.box.y,
+        //   resizedDetections[0].detection.box.width,
+        //   resizedDetections[0].detection.box.height
+        // )
+        resizedDetections.forEach(item =>
+          this.drawSingleFaceDetection(item.detection.box, item.gender, item.age, item.expressions)
         )
-        const box = new faceapi.draw.DrawBox(resizedDetections[0].detection.box, { label: 'asd' })
-        box.draw(this.$refs.canvas)
+        // const box = new faceapi.draw.DrawBox(resizedDetections[0].detection.box, { label: 'asd' })
+        // box.draw(this.$refs.canvas)
         // faceapi.draw.DrawBox(
         //   this.ctx,
         //   resizedDetections[0].detection.box.x,
@@ -109,10 +111,10 @@ export default {
         //   resizedDetections[0].detection.box.height
         // )
         // faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
-        console.log(landmarks.getLeftEyeBrow())
-        this.$refs.canvas.getContext('2d').fillStyle = '#4245f5'
-        this.$refs.canvas.getContext('2d').strokeStyle = '#fc03d7'
-        this.$refs.canvas.getContext('2d').lineWidth = 1
+        // console.log(landmarks.getLeftEyeBrow())
+        this.ctx.fillStyle = '#4245f5'
+        this.ctx.strokeStyle = '#fc03d7'
+        this.ctx.lineWidth = 1
         // canvas.getContext('2d').beginPath()
         // canvas.getContext('2d').moveTo(0, 0)
         // canvas.getContext('2d').lineTo(100, 100)
@@ -136,19 +138,37 @@ export default {
         //   this.ctx.fillRect(point.x, point.y, 3, 3)
         //   console.log(index, points.length)
         // })
-        this.drawSingleFaceLandmard(landmarks.getLeftEyeBrow())
-        this.drawSingleFaceLandmard(landmarks.getLeftEye())
-        this.drawSingleFaceLandmard(landmarks.getRightEyeBrow())
-        this.drawSingleFaceLandmard(landmarks.getRightEye())
-        this.drawSingleFaceLandmard(landmarks.getNose())
-        this.drawSingleFaceLandmard(landmarks.getMouth())
-        this.drawSingleFaceLandmard(landmarks.getJawOutline())
+        landmarks.forEach(item => {
+          this.drawSingleFaceLandmard(item.getLeftEyeBrow())
+          this.drawSingleFaceLandmard(item.getLeftEye())
+          this.drawSingleFaceLandmard(item.getRightEyeBrow())
+          this.drawSingleFaceLandmard(item.getRightEye())
+          this.drawSingleFaceLandmard(item.getNose())
+          this.drawSingleFaceLandmard(item.getMouth())
+          this.drawSingleFaceLandmard(item.getJawOutline())
+        })
 
         // faceapi.draw.drawContour(canvas.getContext('2d'), landmarks.getLeftEyeBrow())
         // faceapi.draw.drawContour(canvas.getContext('2d'), landmarks.getLeftEye())
         // faceapi.draw.drawContour(canvas.getContext('2d'), landmarks.getNose())
-        faceapi.draw.drawFaceExpressions(this.$refs.canvas, resizedDetections)
+        // faceapi.draw.drawFaceExpressions(this.$refs.canvas, resizedDetections)
       }, 1000)
+    },
+    drawSingleFaceDetection(box, gender, age, faceExpressions) {
+      const normalizedGender = gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : '?'
+      const normalizedAge = age ? age.toFixed(0) : '?'
+      const normalizedFaceExpression = faceExpressions
+        ? this.getFaceExpression(faceExpressions)
+        : '?'
+
+      const faceBox = new faceapi.draw.DrawBox(box, {
+        label: `${normalizedGender}/${normalizedAge}/${normalizedFaceExpression}`,
+        lineWidth: 1,
+        boxColor: '#fc03d7',
+        drawLabelOptions: { fontColor: '#000000' },
+      })
+
+      faceBox.draw(this.$refs.canvas)
     },
     drawSingleFaceLandmard(landmark) {
       let startIndex = 0
@@ -163,6 +183,23 @@ export default {
         }
         this.ctx.fillRect(point.x, point.y, this.pointSize, this.pointSize)
       })
+    },
+    getFaceExpression(expressions) {
+      // if (resizedDetections[0]) {
+      // console.log(resizedDetections[0].expressions)
+      // const faceExpression = ''
+      const faceExpressionsProbability = Object.values(expressions).map(item =>
+        Number(item).toFixed(5)
+      )
+      const maxFaceExpressionsProbability = Math.max.apply(Math, faceExpressionsProbability)
+
+      const faceExpression = Object.keys(expressions).filter(function(key) {
+        return Number(expressions[key]).toFixed(5) == maxFaceExpressionsProbability
+      })[0]
+      return faceExpression.charAt(0).toUpperCase() + faceExpression.slice(1)
+      // if (this.faceExpression != faceExpression) this.faceExpression = faceExpression
+      // console.log(faceExpression)
+      // }
     },
   },
 }
