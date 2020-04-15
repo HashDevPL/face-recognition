@@ -1,8 +1,103 @@
 <template>
   <div id="app">
-    <div ref="wrapper" class="wrapper">
-      <video ref="video" width="1280" height="720" muted autoplay @play="startDetections"></video>
-      <canvas ref="canvas" width="1280" height="720"></canvas>
+    <div class="sidebar">
+      <div class="controler">
+        <div class="title">Detect every {{ detectionIntervalTime }}ms</div>
+        <input
+          type="range"
+          class="interval"
+          v-model="detectionIntervalTime"
+          min="100"
+          max="2000"
+          step="100"
+        />
+      </div>
+      <div class="options">
+        <div class="title">Detect</div>
+        <div class="checkbox">
+          <input type="checkbox" id="leftEyeDetection" v-model="detect.leftEye" />
+          <label for="leftEyeDetection">Left eye</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="leftEyeBrowDetection" v-model="detect.leftEyeBrow" />
+          <label for="leftEyeBrowDetection">Left eye brow</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="lrightEyeDetection" v-model="detect.rightEye" />
+          <label for="lrightEyeDetection">Right eye</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="rightEyeBrowDetection" v-model="detect.rightEyeBrow" />
+          <label for="rightEyeBrowDetection">Right eye brow</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="noseDetection" v-model="detect.nose" />
+          <label for="noseDetection">Nose</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="mouthDetection" v-model="detect.mouth" />
+          <label for="mouthDetection">Mouth</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="jawOutlineDetection" v-model="detect.jawOutline" />
+          <label for="jawOutlineDetection">Jaw outline</label>
+        </div>
+      </div>
+      <div class="options">
+        <div class="title">Predict</div>
+        <div class="checkbox">
+          <input type="checkbox" id="genderPrediction" v-model="predict.gender" />
+          <label for="genderPrediction">Gender</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="agePrediction" v-model="predict.age" />
+          <label for="agePrediction">Age</label>
+        </div>
+        <div class="checkbox">
+          <input type="checkbox" id="expressionPrediction" v-model="predict.expression" />
+          <label for="expressionPrediction">Expression</label>
+        </div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="wrapper">
+        <video
+          ref="video"
+          :width="videoSize.width"
+          :height="videoSize.height"
+          muted
+          autoplay
+        ></video>
+        <canvas ref="canvas" :width="videoSize.width" :height="videoSize.height"></canvas>
+      </div>
+      <div class="loader" v-if="!loaded">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          width="400px"
+          height="400px"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="xMidYMid"
+        >
+          <path
+            fill="none"
+            stroke="#fc03d7"
+            stroke-width="6"
+            stroke-dasharray="42.76482137044271 42.76482137044271"
+            d="M24.3 30C11.4 30 5 43.3 5 50s6.4 20 19.3 20c19.3 0 32.1-40 51.4-40 C88.6 30 95 43.3 95 50s-6.4 20-19.3 20C56.4 70 43.6 30 24.3 30z"
+            stroke-linecap="round"
+            style="transform:scale(1);transform-origin:50px 50px"
+          >
+            <animate
+              attributeName="stroke-dashoffset"
+              repeatCount="indefinite"
+              dur="2.5s"
+              keyTimes="0;1"
+              values="0;256.58892822265625"
+            ></animate>
+          </path>
+        </svg>
+      </div>
     </div>
   </div>
 </template>
@@ -15,13 +110,26 @@ export default {
   data() {
     return {
       videoSize: { width: 1280, height: 720 },
+      loaded: false,
       ctx: null,
       pointSize: 3,
+      detectionIntervalTime: 500,
+      detectionInterval: null,
+      detect: {
+        leftEye: true,
+        leftEyeBrow: true,
+        rightEye: true,
+        rightEyeBrow: true,
+        nose: true,
+        mouth: true,
+        jawOutline: true,
+      },
+      predict: { gender: true, age: true, expression: true },
     }
   },
   mounted() {
-    navigator.getUserMedia(
-      { video: { width: 1280, height: 720 } },
+    navigator.mediaDevices.getUserMedia(
+      { video: this.videoSize },
       stream => (this.$refs.video.srcObject = stream),
       error => console.error(error)
     )
@@ -31,128 +139,47 @@ export default {
       faceapi.loadFaceRecognitionModel('./models'),
       faceapi.loadFaceExpressionModel('./models'),
       faceapi.loadAgeGenderModel('./models'),
-    ])
+    ]).then(this.startDetections())
     this.ctx = this.$refs.canvas.getContext('2d')
   },
   methods: {
     startDetections() {
-      // const canvas = faceapi.createCanvasFromMedia(this.$refs.video)
-      // this.$refs.wrapper.appendChild(canvas)
       faceapi.matchDimensions(this.$refs.canvas, this.videoSize)
-      setInterval(async () => {
+      this.createInterval()
+    },
+    createInterval() {
+      this.detectionInterval = setInterval(async () => {
         const detections = await faceapi
           .detectAllFaces(this.$refs.video, new faceapi.TinyFaceDetectorOptions())
           .withFaceLandmarks()
           .withFaceExpressions()
           .withFaceDescriptors()
           .withAgeAndGender()
-        console.log(detections)
-        // let key = Object.keys(detections[0].expressions).reduce((key, v) =>
-        // detections[0].expressions[v] < detections[0].expressions[key] ? v : key
-        // )
-        // console.log(key)
+
+        if (detections.length > 0) this.loaded = true
+
         const resizedDetections = faceapi.resizeResults(detections, this.videoSize)
-        // let key = Object.keys(resizedDetections[0].expressions).reduce((key, v) =>
-        //   resizedDetections[0].expressions[v] < resizedDetections[0].expressions[key] ? v : key
-        // )
-        // if (resizedDetections[0]) {
-        //   // console.log(resizedDetections[0].expressions)
-        //   const faceExpressionsProbability = Object.values(
-        //     resizedDetections[0].expressions
-        //   ).map(item => Number(item).toFixed(5))
-        //   const maxFaceExpressionsProbability = Math.max.apply(Math, faceExpressionsProbability)
-
-        //   const faceExpression = Object.keys(resizedDetections[0].expressions).filter(function(
-        //     key
-        //   ) {
-        //     return (
-        //       Number(resizedDetections[0].expressions[key]).toFixed(5) ==
-        //       maxFaceExpressionsProbability
-        //     )
-        //   })[0]
-        //   if (this.faceExpression != faceExpression) this.faceExpression = faceExpression
-        //   // console.log(faceExpression)
-        // }
-        // faceapi.matchDimensions(canvas, videoSize)
-        // const detection = await faceapi
-        //   .detectSingleFace(this.$refs.video, new faceapi.TinyFaceDetectorOptions())
-        //   .withFaceLandmarks()
         const landmarks = []
-        detections.map(item => landmarks.push(item.landmarks))
-        // const landmarksResized = faceapi.resizeResults(landmarks, videoSize)
 
-        // const jawOutline = landmarksResized.getJawOutline()
-        // const nose = landmarks.getNose()
-        // const mouth = landmarksResized.getMouth()
-        // const leftEye = landmarksResized.getLeftEye()
-        // const rightEye = landmarksResized.getRightEye()
-        // const leftEyeBbrow = landmarksResized.getLeftEyeBrow()
-        // const rightEyeBrow = landmarksResized.getRightEyeBrow()
+        detections.map(item => landmarks.push(item.landmarks))
+
         this.$refs.canvas
           .getContext('2d')
           .clearRect(0, 0, this.$refs.canvas.width, this.$refs.canvas.height)
-        // faceapi.draw.drawDetections(this.$refs.canvas, resizedDetections)
-        // console.log(
-        //   resizedDetections[0].detection.box.x,
-        //   resizedDetections[0].detection.box.y,
-        //   resizedDetections[0].detection.box.width,
-        //   resizedDetections[0].detection.box.height
-        // )
+
         resizedDetections.forEach(item =>
           this.drawSingleFaceDetection(item.detection.box, item.gender, item.age, item.expressions)
         )
-        // const box = new faceapi.draw.DrawBox(resizedDetections[0].detection.box, { label: 'asd' })
-        // box.draw(this.$refs.canvas)
-        // faceapi.draw.DrawBox(
-        //   this.ctx,
-        //   resizedDetections[0].detection.box.x,
-        //   resizedDetections[0].detection.box.y,
-        //   resizedDetections[0].detection.box.width,
-        //   resizedDetections[0].detection.box.height
-        // )
-        // faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
-        // console.log(landmarks.getLeftEyeBrow())
+
         this.ctx.fillStyle = '#4245f5'
         this.ctx.strokeStyle = '#fc03d7'
         this.ctx.lineWidth = 1
-        // canvas.getContext('2d').beginPath()
-        // canvas.getContext('2d').moveTo(0, 0)
-        // canvas.getContext('2d').lineTo(100, 100)
-        // canvas.getContext('2d').stroke()
-        // let startIndex = 0
-        // landmarks.getLeftEyeBrow().map((point, index, points) => {
-        //   if (index < points.length - 1) {
-        //     startIndex++
-        //     console.log('index', index, 'index++', startIndex)
-        //     const nextPoint = points[startIndex]
-        //     console.log(
-        //       `line ${index}  x1: ${point.x} y1: ${point.y} x2: ${nextPoint.x} y2: ${nextPoint.y}`
-        //     )
-        //     // console.log('point', point.x, point.y)
-        //     // console.log('nextPoint', points[nextPointIndex].x, points[nextPointIndex].y)
-        //     this.ctx.beginPath()
-        //     this.ctx.moveTo(point.x, point.y)
-        //     this.ctx.lineTo(nextPoint.x, nextPoint.y)
-        //     this.ctx.stroke()
-        //   }
-        //   this.ctx.fillRect(point.x, point.y, 3, 3)
-        //   console.log(index, points.length)
-        // })
-        landmarks.forEach(item => {
-          this.drawSingleFaceLandmard(item.getLeftEyeBrow())
-          this.drawSingleFaceLandmard(item.getLeftEye())
-          this.drawSingleFaceLandmard(item.getRightEyeBrow())
-          this.drawSingleFaceLandmard(item.getRightEye())
-          this.drawSingleFaceLandmard(item.getNose())
-          this.drawSingleFaceLandmard(item.getMouth())
-          this.drawSingleFaceLandmard(item.getJawOutline())
-        })
 
-        // faceapi.draw.drawContour(canvas.getContext('2d'), landmarks.getLeftEyeBrow())
-        // faceapi.draw.drawContour(canvas.getContext('2d'), landmarks.getLeftEye())
-        // faceapi.draw.drawContour(canvas.getContext('2d'), landmarks.getNose())
-        // faceapi.draw.drawFaceExpressions(this.$refs.canvas, resizedDetections)
-      }, 1000)
+        this.drawFaceLandmarks(landmarks)
+      }, this.detectionIntervalTime)
+    },
+    deleteInterval() {
+      clearInterval(this.detectionInterval)
     },
     drawSingleFaceDetection(box, gender, age, faceExpressions) {
       const normalizedGender = gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : '?'
@@ -161,14 +188,60 @@ export default {
         ? this.getFaceExpression(faceExpressions)
         : '?'
 
+      let faceBoxLabel = ''
+
+      if (this.predict.gender) {
+        faceBoxLabel += normalizedGender
+      }
+      if (this.predict.gender && this.predict.age) {
+        faceBoxLabel += '/'
+      }
+      if (this.predict.age) {
+        faceBoxLabel += normalizedAge
+      }
+      if (this.predict.gender && !this.predict.age && this.predict.expression) {
+        faceBoxLabel += '/'
+      }
+      if (this.predict.age && this.predict.expression) {
+        faceBoxLabel += '/'
+      }
+      if (this.predict.expression) {
+        faceBoxLabel += normalizedFaceExpression
+      }
+      console.log(faceBoxLabel)
       const faceBox = new faceapi.draw.DrawBox(box, {
-        label: `${normalizedGender}/${normalizedAge}/${normalizedFaceExpression}`,
+        label: faceBoxLabel,
         lineWidth: 1,
         boxColor: '#fc03d7',
         drawLabelOptions: { fontColor: '#000000' },
       })
 
       faceBox.draw(this.$refs.canvas)
+    },
+    drawFaceLandmarks(landmarks) {
+      landmarks.forEach(item => {
+        if (this.detect.leftEyeBrow) {
+          this.drawSingleFaceLandmard(item.getLeftEyeBrow())
+        }
+        if (this.detect.leftEye) {
+          this.drawSingleFaceLandmard(item.getLeftEye())
+        }
+        if (this.detect.rightEyeBrow) {
+          this.drawSingleFaceLandmard(item.getRightEyeBrow())
+        }
+        if (this.detect.rightEye) {
+          this.drawSingleFaceLandmard(item.getRightEye())
+        }
+        if (this.detect.nose) {
+          this.drawSingleFaceLandmard(item.getNose())
+        }
+        if (this.detect.mouth) {
+          this.drawSingleFaceLandmard(item.getMouth())
+        }
+        if (this.detect.jawOutline) {
+          this.drawSingleFaceLandmard(item.getJawOutline())
+        }
+      })
     },
     drawSingleFaceLandmard(landmark) {
       let startIndex = 0
@@ -185,9 +258,6 @@ export default {
       })
     },
     getFaceExpression(expressions) {
-      // if (resizedDetections[0]) {
-      // console.log(resizedDetections[0].expressions)
-      // const faceExpression = ''
       const faceExpressionsProbability = Object.values(expressions).map(item =>
         Number(item).toFixed(5)
       )
@@ -197,9 +267,13 @@ export default {
         return Number(expressions[key]).toFixed(5) == maxFaceExpressionsProbability
       })[0]
       return faceExpression.charAt(0).toUpperCase() + faceExpression.slice(1)
-      // if (this.faceExpression != faceExpression) this.faceExpression = faceExpression
-      // console.log(faceExpression)
-      // }
+    },
+  },
+  watch: {
+    detectionIntervalTime() {
+      console.log('change', this.detectionIntervalTime)
+      this.deleteInterval()
+      this.createInterval()
     },
   },
 }
@@ -209,7 +283,7 @@ export default {
 body {
   margin: 0;
   padding: 0;
-  // background: #111111;
+  background: #111111;
 
   #app {
     font-family: Avenir, Helvetica, Arial, sans-serif;
@@ -222,12 +296,111 @@ body {
     justify-content: center;
     align-items: center;
 
-    .wrapper {
+    .sidebar {
+      flex-basis: 15%;
+      height: 100%;
+      background: #000;
+      color: #c1c1c1;
+      font-weight: bold;
+
+      .title {
+        font-size: 18px;
+        margin-bottom: 10px;
+      }
+
+      .controler {
+        padding: 10px;
+        .interval {
+          margin: 10px 0 10px 15px;
+          appearance: none;
+          cursor: pointer;
+          -webkit-appearance: none;
+          height: 10px;
+          background: #838383;
+          outline: none;
+
+          &::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 20px;
+            background: #fc03d7;
+          }
+
+          &::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #fc03d7;
+          }
+        }
+      }
+
+      .options {
+        padding: 10px;
+
+        .checkbox {
+          width: fit-content;
+          margin: 0 0 10px 15px;
+
+          input[type='checkbox'] {
+            visibility: hidden;
+            position: absolute;
+          }
+
+          label {
+            display: flex;
+            align-items: center;
+            height: 20px;
+            &:hover {
+              cursor: pointer;
+            }
+            &:before {
+              content: '';
+              display: block;
+              width: 20px;
+              height: 20px;
+              background: none;
+              border: 1px solid #fc03d7;
+              margin-right: 5px;
+            }
+          }
+
+          input:checked + label {
+            &:before {
+              background: #fc03d7;
+            }
+          }
+        }
+      }
+    }
+
+    .content {
+      flex-basis: 85%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
       position: relative;
-      canvas {
+
+      .wrapper {
+        position: relative;
+        canvas {
+          position: absolute;
+          top: 0;
+          left: 0;
+        }
+      }
+
+      .loader {
         position: absolute;
         top: 0;
         left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.9);
       }
     }
   }
