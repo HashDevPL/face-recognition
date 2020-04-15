@@ -208,7 +208,7 @@ export default {
       if (this.predict.expression) {
         faceBoxLabel += normalizedFaceExpression
       }
-      console.log(faceBoxLabel)
+
       const faceBox = new faceapi.draw.DrawBox(box, {
         label: faceBoxLabel,
         lineWidth: 1,
@@ -271,7 +271,6 @@ export default {
   },
   watch: {
     detectionIntervalTime() {
-      console.log('change', this.detectionIntervalTime)
       this.deleteInterval()
       this.createInterval()
     },
