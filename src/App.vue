@@ -128,7 +128,7 @@ export default {
     }
   },
   mounted() {
-    navigator.mediaDevices.getUserMedia(
+    navigator.getUserMedia(
       { video: this.videoSize },
       stream => (this.$refs.video.srcObject = stream),
       error => console.error(error)
@@ -136,7 +136,6 @@ export default {
     Promise.all([
       faceapi.loadTinyFaceDetectorModel('./models'),
       faceapi.loadFaceLandmarkModel('./models'),
-      faceapi.loadFaceRecognitionModel('./models'),
       faceapi.loadFaceExpressionModel('./models'),
       faceapi.loadAgeGenderModel('./models'),
     ]).then(this.startDetections())
@@ -153,7 +152,6 @@ export default {
           .detectAllFaces(this.$refs.video, new faceapi.TinyFaceDetectorOptions())
           .withFaceLandmarks()
           .withFaceExpressions()
-          .withFaceDescriptors()
           .withAgeAndGender()
 
         if (detections.length > 0) this.loaded = true
@@ -297,6 +295,7 @@ body {
 
     .sidebar {
       flex-basis: 15%;
+      max-width: calc(100% - 1280px);
       height: 100%;
       background: #000;
       color: #c1c1c1;
@@ -310,7 +309,7 @@ body {
       .controler {
         padding: 10px;
         .interval {
-          margin: 10px 0 10px 15px;
+          margin: 10px 0 10px 0;
           appearance: none;
           cursor: pointer;
           -webkit-appearance: none;
@@ -339,7 +338,7 @@ body {
 
         .checkbox {
           width: fit-content;
-          margin: 0 0 10px 15px;
+          margin: 0 0 10px 0;
 
           input[type='checkbox'] {
             visibility: hidden;
@@ -356,8 +355,8 @@ body {
             &:before {
               content: '';
               display: block;
-              width: 20px;
-              height: 20px;
+              width: 15px;
+              height: 15px;
               background: none;
               border: 1px solid #fc03d7;
               margin-right: 5px;
@@ -375,6 +374,7 @@ body {
 
     .content {
       flex-basis: 85%;
+      min-width: 1280px;
       display: flex;
       justify-content: center;
       align-items: center;
