@@ -128,11 +128,10 @@ export default {
     }
   },
   mounted() {
-    navigator.getUserMedia(
-      { video: this.videoSize },
-      stream => (this.$refs.video.srcObject = stream),
-      error => console.error(error)
-    )
+    navigator.mediaDevices
+      .getUserMedia({ audio: false, video: this.videoSize })
+      .then(stream => (this.$refs.video.srcObject = stream))
+      .catch(error => console.error(error))
     Promise.all([
       faceapi.loadTinyFaceDetectorModel('./models'),
       faceapi.loadFaceLandmarkModel('./models'),
